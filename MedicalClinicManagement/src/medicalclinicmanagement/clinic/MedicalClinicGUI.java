@@ -5,6 +5,8 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.sql.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Vector;
 
@@ -126,8 +128,7 @@ public class MedicalClinicGUI extends JFrame {
     }
 
     private JPanel createDashboardPanel() {
-        JPanel dashboardPanel = new JPanel();
-        dashboardPanel.setLayout(new BorderLayout());
+        JPanel dashboardPanel = new JPanel(new BorderLayout());
         dashboardPanel.setBackground(Color.WHITE);
         dashboardPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
 
@@ -150,10 +151,8 @@ public class MedicalClinicGUI extends JFrame {
             metricsPanel.add(createDashboardCard("Active Doctors", getCountFromTable(conn, "doctors")));
         } catch (SQLException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this,
-                    "Error fetching dashboard data: " + e.getMessage(),
-                    "Error",
-                    JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Error fetching dashboard data: " + e.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
         }
 
         dashboardPanel.add(metricsPanel, BorderLayout.CENTER);
@@ -162,17 +161,18 @@ public class MedicalClinicGUI extends JFrame {
     }
 
     private JPanel createDashboardCard(String title, String value) {
-        JPanel card = new JPanel();
-        card.setLayout(new BorderLayout());
+        JPanel card = new JPanel(new BorderLayout());
         card.setBackground(new Color(236, 240, 241)); // Light Gray
         card.setBorder(BorderFactory.createLineBorder(new Color(189, 195, 199), 1));
 
+        // Title Label
         JLabel titleLabel = new JLabel(title);
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
         titleLabel.setForeground(new Color(44, 62, 80)); // Dark Gray
         titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
         card.add(titleLabel, BorderLayout.NORTH);
 
+        // Value Label
         JLabel valueLabel = new JLabel(value);
         valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
         valueLabel.setForeground(new Color(41, 128, 185)); // Flat Blue
@@ -180,6 +180,12 @@ public class MedicalClinicGUI extends JFrame {
         card.add(valueLabel, BorderLayout.CENTER);
 
         return card;
+    }
+
+    private void refreshDashboard() {
+        JPanel dashboardPanel = createDashboardPanel();
+        cardPanel.add(dashboardPanel, "Dashboard");
+        cardLayout.show(cardPanel, "Dashboard");
     }
 
     private String getCountFromTable(Connection conn, String tableName) throws SQLException {
@@ -264,6 +270,7 @@ public class MedicalClinicGUI extends JFrame {
                 int id = (int) model.getValueAt(selectedRow, 0); // Retrieve the hidden ID
                 deleteRecord(tableName, id);
                 model.removeRow(selectedRow); // Remove from UI
+                refreshDashboard(); // Refresh dashboard
             } else {
                 JOptionPane.showMessageDialog(this, "Please select a record to delete.");
             }
@@ -338,7 +345,7 @@ public class MedicalClinicGUI extends JFrame {
                                 FROM billing b
                                 JOIN patients p ON b.patient_id = p.id
                             """;
-                    columnNames.add("Billing ID"); // ID column for internal use
+                    columnNames.add("Billing ID"); // Internal use
                     columnNames.add("Patient Name");
                     columnNames.add("Amount");
                     columnNames.add("Billing Date");
@@ -372,8 +379,10 @@ public class MedicalClinicGUI extends JFrame {
 
             while (rs.next()) {
                 Vector<Object> row = new Vector<>();
-                for (int i = 1; i <= columnNames.size(); i++) { // Include ID
-                    row.add(rs.getObject(i));
+                for (int i = 1; i <= columnNames.size(); i++) {
+                    Object value = rs.getObject(i);
+                    System.out.println("Column: " + columnNames.get(i - 1) + ", Value: " + value);
+                    row.add(value);
                 }
                 model.addRow(row);
             }
@@ -437,7 +446,9 @@ public class MedicalClinicGUI extends JFrame {
         ArrayList<JTextField> fields = new ArrayList<>();
         ArrayList<String> columnNames = new ArrayList<>();
 
-        // Fetch columns dynamically (skipping "id")
+        // Define date-time formatter
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+
         try (Connection conn = DatabaseConnection.getInstance().getConnection();
                 Statement stmt = conn.createStatement()) {
 
@@ -452,10 +463,18 @@ public class MedicalClinicGUI extends JFrame {
                         columnNames.add(columnName);
 
                         JLabel label = new JLabel(columnName);
-                        JTextField textField = new JTextField();
+                        JTextField textField;
+
+                        if (columnName.equalsIgnoreCase("billing_date")) {
+                            // Set the current date-time in the specified format
+                            textField = new JTextField(LocalDateTime.now().format(formatter));
+                            textField.setEditable(false); // Make it non-editable
+                        } else {
+                            textField = new JTextField();
+                        }
+
                         formPanel.add(label);
                         formPanel.add(textField);
-
                         fields.add(textField);
                     }
                 }
@@ -504,11 +523,12 @@ public class MedicalClinicGUI extends JFrame {
                 }
 
                 JOptionPane.showMessageDialog(insertDialog, "Record inserted successfully!");
+                refreshDashboard(); // Refresh the dashboard immediately
                 insertDialog.dispose();
             } catch (SQLException ex) {
                 ex.printStackTrace();
-                JOptionPane.showMessageDialog(insertDialog, "Error inserting record: " + ex.getMessage(), "Error",
-                        JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(insertDialog, "Error inserting record: " + ex.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
 
@@ -606,11 +626,12 @@ public class MedicalClinicGUI extends JFrame {
                 }
 
                 JOptionPane.showMessageDialog(editDialog, "Record updated successfully!");
+                refreshDashboard(); // Refresh the dashboard immediately
                 editDialog.dispose();
             } catch (SQLException ex) {
                 ex.printStackTrace();
-                JOptionPane.showMessageDialog(editDialog, "Error updating record: " + ex.getMessage(), "Error",
-                        JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(editDialog, "Error updating record: " + ex.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
 
