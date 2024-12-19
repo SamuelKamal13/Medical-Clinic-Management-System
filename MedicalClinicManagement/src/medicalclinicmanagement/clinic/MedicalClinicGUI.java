@@ -5,6 +5,7 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.Vector;
 
 public class MedicalClinicGUI extends JFrame {
@@ -92,7 +93,7 @@ public class MedicalClinicGUI extends JFrame {
         sidebarPanel.setLayout(new BoxLayout(sidebarPanel, BoxLayout.Y_AXIS));
         sidebarPanel.setBorder(new EmptyBorder(20, 0, 0, 0));
 
-        String[] buttonLabels = {"Dashboard", "Patients", "Doctors", "Appointments", "Billing", "Medical History"};
+        String[] buttonLabels = { "Dashboard", "Patients", "Doctors", "Appointments", "Billing", "Medical History" };
         for (String label : buttonLabels) {
             JButton button = createStyledButton(label);
             sidebarPanel.add(button);
@@ -160,7 +161,6 @@ public class MedicalClinicGUI extends JFrame {
         return dashboardPanel;
     }
 
-
     private JPanel createDashboardCard(String title, String value) {
         JPanel card = new JPanel();
         card.setLayout(new BorderLayout());
@@ -185,7 +185,7 @@ public class MedicalClinicGUI extends JFrame {
     private String getCountFromTable(Connection conn, String tableName) throws SQLException {
         String query = "SELECT COUNT(*) AS count FROM " + tableName;
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
+                ResultSet rs = stmt.executeQuery(query)) {
             if (rs.next()) {
                 return String.valueOf(rs.getInt("count"));
             }
@@ -196,7 +196,7 @@ public class MedicalClinicGUI extends JFrame {
     private String getSumFromColumn(Connection conn, String tableName, String columnName) throws SQLException {
         String query = "SELECT SUM(" + columnName + ") AS total FROM " + tableName;
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
+                ResultSet rs = stmt.executeQuery(query)) {
             if (rs.next()) {
                 return "$" + rs.getDouble("total");
             }
@@ -225,23 +225,72 @@ public class MedicalClinicGUI extends JFrame {
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         panel.add(scrollPane, BorderLayout.CENTER);
 
+        // Fetch and Populate Data
+        populateCustomTable(tableName, model);
+
+        // Hide the ID column
+        table.getColumnModel().getColumn(0).setMinWidth(0);
+        table.getColumnModel().getColumn(0).setMaxWidth(0);
+        table.getColumnModel().getColumn(0).setWidth(0);
+
+        // Action Buttons
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        actionPanel.setBackground(Color.WHITE);
+
+        JButton insertButton = createStyledButton("Insert");
+        JButton editButton = createStyledButton("Edit");
+        JButton deleteButton = createStyledButton("Delete");
+
+        actionPanel.add(insertButton);
+        actionPanel.add(editButton);
+        actionPanel.add(deleteButton);
+        panel.add(actionPanel, BorderLayout.SOUTH);
+
+        // Button Actions
+        insertButton.addActionListener(e -> openInsertDialog(tableName, model));
+        editButton.addActionListener(e -> {
+            int selectedRow = table.getSelectedRow();
+            if (selectedRow != -1) {
+                int id = (int) model.getValueAt(selectedRow, 0); // Retrieve the hidden ID
+                openEditDialog(tableName, id, table, model); // Pass JTable and model to the dialog
+            } else {
+                JOptionPane.showMessageDialog(this, "Please select a record to edit.");
+            }
+        });
+
+        deleteButton.addActionListener(e -> {
+            int selectedRow = table.getSelectedRow();
+            if (selectedRow != -1) {
+                int id = (int) model.getValueAt(selectedRow, 0); // Retrieve the hidden ID
+                deleteRecord(tableName, id);
+                model.removeRow(selectedRow); // Remove from UI
+            } else {
+                JOptionPane.showMessageDialog(this, "Please select a record to delete.");
+            }
+        });
+
+        return panel;
+    }
+
+    private void populateCustomTable(String tableName, DefaultTableModel model) {
+        String query;
+        Vector<String> columnNames = new Vector<>();
+
         try (Connection conn = DatabaseConnection.getInstance().getConnection();
-            Statement stmt = conn.createStatement()) {
+                Statement stmt = conn.createStatement()) {
 
-            String query;
-            Vector<String> columnNames = new Vector<>();
-
+            // Custom Query and Column Names
             switch (tableName) {
                 case "patients":
                     query = """
-                        SELECT id AS `Patient ID`, 
-                               name AS `Patient Name`, 
-                               age AS `Age`, 
-                               gender AS `Gender`, 
-                               contact AS `Contact`
-                        FROM patients
-                    """;
-                    columnNames.add("Patient ID");
+                                SELECT id AS `Patient ID`,
+                                       name AS `Patient Name`,
+                                       age AS `Age`,
+                                       gender AS `Gender`,
+                                       contact AS `Contact`
+                                FROM patients
+                            """;
+                    columnNames.add("Patient ID"); // ID column for internal use
                     columnNames.add("Patient Name");
                     columnNames.add("Age");
                     columnNames.add("Gender");
@@ -250,13 +299,13 @@ public class MedicalClinicGUI extends JFrame {
 
                 case "doctors":
                     query = """
-                        SELECT id AS `Doctor ID`, 
-                               name AS `Doctor Name`, 
-                               specialty AS `Specialty`, 
-                               contact AS `Contact`
-                        FROM doctors
-                    """;
-                    columnNames.add("Doctor ID");
+                                SELECT id AS `Doctor ID`,
+                                       name AS `Doctor Name`,
+                                       specialty AS `Specialty`,
+                                       contact AS `Contact`
+                                FROM doctors
+                            """;
+                    columnNames.add("Doctor ID"); // ID column for internal use
                     columnNames.add("Doctor Name");
                     columnNames.add("Specialty");
                     columnNames.add("Contact");
@@ -264,32 +313,32 @@ public class MedicalClinicGUI extends JFrame {
 
                 case "appointments":
                     query = """
-                        SELECT a.id AS `Appointment ID`, 
-                               p.name AS `Patient Name`, 
-                               d.name AS `Doctor Name`, 
-                               a.appointment_date AS `Appointment Date`, 
-                               a.notes AS `Notes`
-                        FROM appointments a
-                        JOIN patients p ON a.patient_id = p.id
-                        JOIN doctors d ON a.doctor_id = d.id
-                    """;
-                    columnNames.add("Appointment ID");
+                                SELECT a.id AS `Appointment ID`,
+                                       p.name AS `Patient Name`,
+                                       d.name AS `Doctor Name`,
+                                       a.appointment_date AS `Appointment Date`,
+                                       a.notes AS `Notes`
+                                FROM appointments a
+                                JOIN patients p ON a.patient_id = p.id
+                                JOIN doctors d ON a.doctor_id = d.id
+                            """;
+                    columnNames.add("Appointment ID"); // ID column for internal use
                     columnNames.add("Patient Name");
                     columnNames.add("Doctor Name");
                     columnNames.add("Appointment Date");
                     columnNames.add("Notes");
                     break;
-                
+
                 case "billing":
                     query = """
-                        SELECT b.id AS `Billing ID`, 
-                               p.name AS `Patient Name`, 
-                               b.amount AS `Amount`, 
-                               b.billing_date AS `Billing Date`
-                        FROM billing b
-                        JOIN patients p ON b.patient_id = p.id
-                    """;
-                    columnNames.add("Billing ID");
+                                SELECT b.id AS `Billing ID`,
+                                       p.name AS `Patient Name`,
+                                       b.amount AS `Amount`,
+                                       b.billing_date AS `Billing Date`
+                                FROM billing b
+                                JOIN patients p ON b.patient_id = p.id
+                            """;
+                    columnNames.add("Billing ID"); // ID column for internal use
                     columnNames.add("Patient Name");
                     columnNames.add("Amount");
                     columnNames.add("Billing Date");
@@ -297,39 +346,33 @@ public class MedicalClinicGUI extends JFrame {
 
                 case "medical_history":
                     query = """
-                        SELECT mh.id AS `History ID`, 
-                               p.name AS `Patient Name`, 
-                               mh.history_details AS `History Details`
-                    FROM medical_history mh
-                    JOIN patients p ON mh.patient_id = p.id
-                    """;
-                    columnNames.add("History ID");
+                                SELECT mh.id AS `History ID`,
+                                       p.name AS `Patient Name`,
+                                       mh.history_details AS `History Details`
+                                FROM medical_history mh
+                                JOIN patients p ON mh.patient_id = p.id
+                            """;
+                    columnNames.add("History ID"); // ID column for internal use
                     columnNames.add("Patient Name");
                     columnNames.add("History Details");
                     break;
 
                 default:
-                    query = "SELECT * FROM " + tableName; // Default for other tables
-            }
-
-            ResultSet rs = stmt.executeQuery(query);
-
-            // Set Column Names
-            if (!columnNames.isEmpty()) {
-                model.setColumnIdentifiers(columnNames);
-            } else {
-                ResultSetMetaData metaData = rs.getMetaData();
-                int columnCount = metaData.getColumnCount();
-                for (int i = 1; i <= columnCount; i++) {
+                    query = "SELECT * FROM " + tableName;
+                    ResultSetMetaData metaData = stmt.executeQuery(query).getMetaData();
+                    int columnCount = metaData.getColumnCount();
+                    for (int i = 1; i <= columnCount; i++) {
                         columnNames.add(metaData.getColumnName(i));
-                }
-                model.setColumnIdentifiers(columnNames);
+                    }
             }
 
-            // Populate Table Rows
+            // Execute Query and Populate Data
+            ResultSet rs = stmt.executeQuery(query);
+            model.setColumnIdentifiers(columnNames);
+
             while (rs.next()) {
                 Vector<Object> row = new Vector<>();
-                for (int i = 1; i <= columnNames.size(); i++) {
+                for (int i = 1; i <= columnNames.size(); i++) { // Include ID
                     row.add(rs.getObject(i));
                 }
                 model.addRow(row);
@@ -337,10 +380,289 @@ public class MedicalClinicGUI extends JFrame {
 
         } catch (SQLException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error fetching data from " + title + ": " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Error fetching data: " + e.getMessage(), "Error",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private String validateFields(ArrayList<JTextField> fields, ArrayList<String> columnNames) {
+        for (int i = 0; i < columnNames.size(); i++) {
+            String columnName = columnNames.get(i);
+            String value = fields.get(i).getText().trim();
+
+            switch (columnName.toLowerCase()) {
+                case "gender":
+                    if (!value.equalsIgnoreCase("Male") && !value.equalsIgnoreCase("Female")) {
+                        return "Gender must be 'Male' or 'Female'.";
+                    }
+                    break;
+
+                case "age":
+                    try {
+                        int age = Integer.parseInt(value);
+                        if (age <= 0) {
+                            return "Age must be a positive integer.";
+                        }
+                    } catch (NumberFormatException e) {
+                        return "Age must be a valid integer.";
+                    }
+                    break;
+
+                case "contact":
+                    if (!value.matches("\\d+")) {
+                        return "Contact must be a numeric value.";
+                    }
+                    if (value.length() != 10) {
+                        return "Contact must be a 10-digit number.";
+                    }
+                    break;
+
+                default:
+                    // No validation for other fields
+                    break;
+            }
         }
 
-        return panel;
+        return ""; // No errors
+    }
+
+    private void openInsertDialog(String tableName, DefaultTableModel model) {
+        JDialog insertDialog = new JDialog(this, "Insert New Record", true);
+        insertDialog.setSize(400, 300);
+        insertDialog.setLocationRelativeTo(this);
+
+        JPanel formPanel = new JPanel(new GridLayout(0, 2, 10, 10));
+        formPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        ArrayList<JTextField> fields = new ArrayList<>();
+        ArrayList<String> columnNames = new ArrayList<>();
+
+        // Fetch columns dynamically (skipping "id")
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+                Statement stmt = conn.createStatement()) {
+
+            String query = "SELECT * FROM " + tableName + " LIMIT 1";
+            try (ResultSet rs = stmt.executeQuery(query)) {
+                if (rs.next()) {
+                    ResultSetMetaData metaData = rs.getMetaData();
+                    int columnCount = metaData.getColumnCount();
+
+                    for (int i = 2; i <= columnCount; i++) { // Skip ID
+                        String columnName = metaData.getColumnName(i);
+                        columnNames.add(columnName);
+
+                        JLabel label = new JLabel(columnName);
+                        JTextField textField = new JTextField();
+                        formPanel.add(label);
+                        formPanel.add(textField);
+
+                        fields.add(textField);
+                    }
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error fetching columns: " + e.getMessage());
+            return;
+        }
+
+        JButton saveButton = new JButton("Save");
+        saveButton.addActionListener(e -> {
+            // Perform validation
+            String validationError = validateFields(fields, columnNames);
+            if (!validationError.isEmpty()) {
+                JOptionPane.showMessageDialog(insertDialog, validationError, "Validation Error",
+                        JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Insert into database
+            try (Connection conn = DatabaseConnection.getInstance().getConnection();
+                    PreparedStatement pstmt = conn.prepareStatement(buildInsertQuery(tableName, columnNames),
+                            Statement.RETURN_GENERATED_KEYS)) {
+
+                for (int i = 0; i < fields.size(); i++) {
+                    pstmt.setString(i + 1, fields.get(i).getText());
+                }
+
+                pstmt.executeUpdate();
+
+                // Retrieve generated ID
+                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        int generatedId = generatedKeys.getInt(1);
+
+                        // Add new row to table model
+                        Vector<Object> row = new Vector<>();
+                        row.add(generatedId);
+                        for (JTextField field : fields) {
+                            row.add(field.getText());
+                        }
+                        model.addRow(row);
+                    }
+                }
+
+                JOptionPane.showMessageDialog(insertDialog, "Record inserted successfully!");
+                insertDialog.dispose();
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(insertDialog, "Error inserting record: " + ex.getMessage(), "Error",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        formPanel.add(new JLabel());
+        formPanel.add(saveButton);
+
+        insertDialog.add(formPanel);
+        insertDialog.setVisible(true);
+    }
+
+    private String buildInsertQuery(String tableName, ArrayList<String> columnNames) {
+        StringBuilder query = new StringBuilder("INSERT INTO ");
+        query.append(tableName).append(" (");
+
+        for (int i = 0; i < columnNames.size(); i++) {
+            query.append(columnNames.get(i));
+            if (i < columnNames.size() - 1)
+                query.append(", ");
+        }
+
+        query.append(") VALUES (");
+        for (int i = 0; i < columnNames.size(); i++) {
+            query.append("?");
+            if (i < columnNames.size() - 1)
+                query.append(", ");
+        }
+        query.append(")");
+        return query.toString();
+    }
+
+    private void openEditDialog(String tableName, int id, JTable table, DefaultTableModel model) {
+        JDialog editDialog = new JDialog(this, "Edit Record", true);
+        editDialog.setSize(400, 300);
+        editDialog.setLocationRelativeTo(this);
+
+        JPanel formPanel = new JPanel(new GridLayout(0, 2, 10, 10));
+        formPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        ArrayList<JTextField> fields = new ArrayList<>();
+        ArrayList<String> columnNames = new ArrayList<>();
+
+        // Fetch current data for the record
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+                Statement stmt = conn.createStatement()) {
+
+            String query = "SELECT * FROM " + tableName + " WHERE id = " + id;
+            try (ResultSet rs = stmt.executeQuery(query)) {
+                if (rs.next()) {
+                    ResultSetMetaData metaData = rs.getMetaData();
+                    int columnCount = metaData.getColumnCount();
+
+                    for (int i = 2; i <= columnCount; i++) { // Skip ID
+                        String columnName = metaData.getColumnName(i);
+                        columnNames.add(columnName);
+
+                        JLabel label = new JLabel(columnName);
+                        JTextField textField = new JTextField(rs.getString(columnName));
+                        formPanel.add(label);
+                        formPanel.add(textField);
+
+                        fields.add(textField);
+                    }
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error fetching record: " + e.getMessage());
+            return;
+        }
+
+        JButton saveButton = new JButton("Save");
+        saveButton.addActionListener(e -> {
+            // Perform validation
+            String validationError = validateFields(fields, columnNames);
+            if (!validationError.isEmpty()) {
+                JOptionPane.showMessageDialog(editDialog, validationError, "Validation Error",
+                        JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Update record in the database
+            try (Connection conn = DatabaseConnection.getInstance().getConnection();
+                    PreparedStatement pstmt = conn.prepareStatement(buildUpdateQuery(tableName, columnNames, id))) {
+
+                for (int i = 0; i < fields.size(); i++) {
+                    pstmt.setString(i + 1, fields.get(i).getText());
+                }
+
+                pstmt.executeUpdate();
+
+                // Update the table model
+                for (int i = 0; i < fields.size(); i++) {
+                    model.setValueAt(fields.get(i).getText(), table.getSelectedRow(), i + 1);
+                }
+
+                JOptionPane.showMessageDialog(editDialog, "Record updated successfully!");
+                editDialog.dispose();
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(editDialog, "Error updating record: " + ex.getMessage(), "Error",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        formPanel.add(new JLabel());
+        formPanel.add(saveButton);
+
+        editDialog.add(formPanel);
+        editDialog.setVisible(true);
+    }
+
+    private String buildUpdateQuery(String tableName, ArrayList<String> columnNames, int id) {
+        StringBuilder query = new StringBuilder("UPDATE ");
+        query.append(tableName).append(" SET ");
+
+        for (int i = 0; i < columnNames.size(); i++) {
+            query.append(columnNames.get(i)).append(" = ?");
+            if (i < columnNames.size() - 1) {
+                query.append(", ");
+            }
+        }
+
+        query.append(" WHERE id = ").append(id);
+        return query.toString();
+    }
+
+    private void deleteRecord(String tableName, int id) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+                Statement stmt = conn.createStatement()) {
+
+            // Delete dependent records if any
+            if ("patients".equals(tableName)) {
+                String deleteAppointmentsQuery = "DELETE FROM appointments WHERE patient_id = " + id;
+                String deleteBillingQuery = "DELETE FROM billing WHERE patient_id = " + id;
+                String deleteHistoryQuery = "DELETE FROM medical_history WHERE patient_id = " + id;
+
+                stmt.executeUpdate(deleteAppointmentsQuery);
+                stmt.executeUpdate(deleteBillingQuery);
+                stmt.executeUpdate(deleteHistoryQuery);
+            } else if ("doctors".equals(tableName)) {
+                String deleteAppointmentsQuery = "DELETE FROM appointments WHERE doctor_id = " + id;
+                stmt.executeUpdate(deleteAppointmentsQuery);
+            }
+
+            // Delete the main record
+            String deleteQuery = "DELETE FROM " + tableName + " WHERE id = " + id;
+            stmt.executeUpdate(deleteQuery);
+
+            JOptionPane.showMessageDialog(this, "Record deleted successfully!");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error deleting record: " + e.getMessage());
+        }
     }
 
     private JPanel createFooterPanel() {
@@ -348,15 +670,12 @@ public class MedicalClinicGUI extends JFrame {
         footerPanel.setBackground(new Color(41, 128, 185)); // Flat Blue
         footerPanel.setPreferredSize(new Dimension(1200, 40));
 
-        JLabel footerLabel = new JLabel("© 2024 Medical Clinic Management System | For Selected Labs in Software Engineering Project");
+        JLabel footerLabel = new JLabel(
+                "© 2024 Medical Clinic Management System | For Selected Labs in Software Engineering Project");
         footerLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         footerLabel.setForeground(Color.WHITE);
         footerPanel.add(footerLabel);
 
         return footerPanel;
-    }
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(MedicalClinicGUI::new);
     }
 }
