@@ -58,14 +58,19 @@ public class PatientDatabaseManager {
     }
 
     // Fetch all patients from the database
-    public List<Patient> getPatients() {
-        List<Patient> patients = new ArrayList<>();
-        String sql = "SELECT id, name, age, contact_info FROM Patients";
+    public List<Patient> getPatients(String searchText) {
+    List<Patient> patients = new ArrayList<>();
+    String sql = "SELECT id, name, age, contact_info FROM Patients WHERE id LIKE ? OR name LIKE ?";
 
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
+    try (Connection connection = DatabaseConnection.getConnection();
+         PreparedStatement statement = connection.prepareStatement(sql)) {
+        
+        // Set the search parameter for both id and name
+        String searchPattern = "%" + searchText + "%";  // Use "%" for LIKE query
+        statement.setString(1, searchPattern);
+        statement.setString(2, searchPattern);
 
+        try (ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 String id = resultSet.getString("id");
                 String name = resultSet.getString("name");
@@ -75,11 +80,13 @@ public class PatientDatabaseManager {
                 Patient patient = new Patient(id, name, age, contactInfo);
                 patients.add(patient);
             }
-        } catch (SQLException e) {
-            System.err.println("Failed to fetch patients: " + e.getMessage());
         }
-        return patients;
+    } catch (SQLException e) {
+        System.err.println("Failed to fetch patients: " + e.getMessage());
     }
+    return patients;
+}
+
 
     // Delete patient by ID
     public void deletePatient(String patientId) {
@@ -112,4 +119,19 @@ public class PatientDatabaseManager {
             System.err.println("Failed to update patient: " + e.getMessage());
         }
     }
+    
+    // In PatientDatabaseManager class:
+public void deleteLabResultsForPatient(String patientId) {
+    String sql = "DELETE FROM LabResults WHERE patient_id = ?";
+    try (Connection connection = DatabaseConnection.getConnection();
+         PreparedStatement statement = connection.prepareStatement(sql)) {
+
+        statement.setString(1, patientId);
+        statement.executeUpdate();
+
+    } catch (SQLException e) {
+        System.err.println("Failed to delete lab results: " + e.getMessage());
+    }
+}
+
 }

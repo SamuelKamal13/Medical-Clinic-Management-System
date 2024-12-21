@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package ui;
 
 import javax.swing.*;
@@ -38,21 +34,32 @@ public class DashboardUI extends JFrame {
         sidebarPanel.setLayout(new BoxLayout(sidebarPanel, BoxLayout.Y_AXIS));
         sidebarPanel.setPreferredSize(new Dimension(250, 800));
 
+        // Create buttons for sidebar
         JButton managePatientsButton = createSidebarButton("Manage Patients");
+        JButton manageDoctorsButton = createSidebarButton("Manage Doctors"); // New button for Manage Doctors
         JButton appointmentsButton = createSidebarButton("Appointments");
+        JButton labResultsButton = createSidebarButton("Lab Results");
         JButton logoutButton = createSidebarButton("Logout");
 
+        // Action Listeners for buttons
         managePatientsButton.addActionListener(e -> new ManagePatientsUI().setVisible(true));
+        manageDoctorsButton.addActionListener(e -> new ManageDoctorsUI().setVisible(true)); // Action for Manage Doctors
         appointmentsButton.addActionListener(e -> new AppointmentUI().setVisible(true));
+        labResultsButton.addActionListener(e -> new LabResultUI().setVisible(true));
         logoutButton.addActionListener(e -> {
             new LoginUI().setVisible(true);
             dispose();
         });
 
+        // Add buttons to sidebar
         sidebarPanel.add(Box.createRigidArea(new Dimension(0, 20)));
         sidebarPanel.add(managePatientsButton);
         sidebarPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        sidebarPanel.add(manageDoctorsButton); // Adding Manage Doctors button
+        sidebarPanel.add(Box.createRigidArea(new Dimension(0, 10)));
         sidebarPanel.add(appointmentsButton);
+        sidebarPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        sidebarPanel.add(labResultsButton);
         sidebarPanel.add(Box.createVerticalGlue());
         sidebarPanel.add(logoutButton);
         sidebarPanel.add(Box.createRigidArea(new Dimension(0, 20)));

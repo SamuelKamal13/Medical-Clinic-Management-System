@@ -5,6 +5,8 @@ import utils.DatabaseConnection;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.sql.*;
 import javax.swing.table.DefaultTableModel;
 
@@ -67,24 +69,89 @@ public class AppointmentUI extends JFrame {
         formPanel.add(timeSlotField);
 
         // Button panel for add, update, and delete actions
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.setBackground(Color.WHITE);
+JPanel buttonPanel = new JPanel();
+buttonPanel.setBackground(Color.WHITE);
 
-        JButton addButton = new JButton("Add Appointment");
-        JButton updateButton = new JButton("Update Appointment");
-        JButton deleteButton = new JButton("Delete Appointment");
+// Add Button
+JButton addButton = new JButton("Add Appointment");
+addButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+addButton.setMaximumSize(new Dimension(180, 40));
+addButton.setFont(new Font("Segoe UI", Font.BOLD, 16));
+addButton.setForeground(Color.WHITE);
+addButton.setBackground(new Color(52, 73, 94));
+addButton.setBorderPainted(false);
+addButton.setFocusPainted(false);
+addButton.setContentAreaFilled(false);
+addButton.setOpaque(true);
 
-        addButton.setFont(new Font("SansSerif", Font.BOLD, 14));
-        updateButton.setFont(new Font("SansSerif", Font.BOLD, 14));
-        deleteButton.setFont(new Font("SansSerif", Font.BOLD, 14));
+// Hover effect for Add Button
+addButton.addMouseListener(new MouseAdapter() {
+    @Override
+    public void mouseEntered(MouseEvent e) {
+        addButton.setBackground(new Color(44, 62, 80));
+    }
 
-        addButton.setBackground(new Color(33, 150, 243));
-        updateButton.setBackground(new Color(33, 150, 243));
-        deleteButton.setBackground(new Color(233, 33, 33));
+    @Override
+    public void mouseExited(MouseEvent e) {
+        addButton.setBackground(new Color(52, 73, 94));
+    }
+});
 
-        addButton.setForeground(Color.WHITE);
-        updateButton.setForeground(Color.WHITE);
-        deleteButton.setForeground(Color.WHITE);
+// Update Button
+JButton updateButton = new JButton("Update Appointment");
+updateButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+updateButton.setMaximumSize(new Dimension(180, 40));
+updateButton.setFont(new Font("Segoe UI", Font.BOLD, 16));
+updateButton.setForeground(Color.WHITE);
+updateButton.setBackground(new Color(52, 73, 94));
+updateButton.setBorderPainted(false);
+updateButton.setFocusPainted(false);
+updateButton.setContentAreaFilled(false);
+updateButton.setOpaque(true);
+
+// Hover effect for Update Button
+updateButton.addMouseListener(new MouseAdapter() {
+    @Override
+    public void mouseEntered(MouseEvent e) {
+        updateButton.setBackground(new Color(44, 62, 80));
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
+        updateButton.setBackground(new Color(52, 73, 94));
+    }
+});
+
+// Delete Button
+JButton deleteButton = new JButton("Delete Appointment");
+deleteButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+deleteButton.setMaximumSize(new Dimension(180, 40));
+deleteButton.setFont(new Font("Segoe UI", Font.BOLD, 16));
+deleteButton.setForeground(Color.WHITE);
+deleteButton.setBackground(new Color(192, 57, 43)); // Red background for delete button
+deleteButton.setBorderPainted(false);
+deleteButton.setFocusPainted(false);
+deleteButton.setContentAreaFilled(false);
+deleteButton.setOpaque(true);
+
+// Hover effect for Delete Button
+deleteButton.addMouseListener(new MouseAdapter() {
+    @Override
+    public void mouseEntered(MouseEvent e) {
+        deleteButton.setBackground(new Color(169, 50, 38)); // Darker red on hover
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
+        deleteButton.setBackground(new Color(192, 57, 43)); // Original red
+    }
+});
+
+// Add buttons to the panel
+buttonPanel.add(addButton);
+buttonPanel.add(updateButton);
+buttonPanel.add(deleteButton);
+
 
         addButton.setFocusPainted(false);
         updateButton.setFocusPainted(false);
@@ -241,49 +308,33 @@ public class AppointmentUI extends JFrame {
     }
 
     private void loadAppointments() {
-        // Fetch appointments from database
-        String sql = "SELECT * FROM Appointments";
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
+    String sql = "SELECT a.id, p.name AS patient_name, a.doctor_name, a.time_slot " +
+                 "FROM Appointments a " +
+                 "JOIN Patients p ON a.patient_id = p.id";
 
-            // Clear the table before loading new data
-            tableModel.setRowCount(0);
+    try (Connection connection = DatabaseConnection.getConnection();
+         PreparedStatement statement = connection.prepareStatement(sql);
+         ResultSet resultSet = statement.executeQuery()) {
 
-            while (resultSet.next()) {
-                int id = resultSet.getInt("id");
-                String patientId = resultSet.getString("patient_id");
-                String doctorName = resultSet.getString("doctor_name");
-                String timeSlot = resultSet.getString("time_slot");
+        // Clear the table before loading new data
+        tableModel.setRowCount(0);
 
-                // Fetch the patient's name from the database using patient_id
-                String patientName = getPatientNameById(patientId);
+        // Iterate through the ResultSet and populate the table
+        while (resultSet.next()) {
+            int id = resultSet.getInt("id");
+            String patientName = resultSet.getString("patient_name");
+            String doctorName = resultSet.getString("doctor_name");
+            String timeSlot = resultSet.getString("time_slot");
 
-                tableModel.addRow(new Object[]{id, patientName, doctorName, timeSlot});
-            }
-
-        } catch (SQLException e) {
-            System.err.println("Failed to load appointments: " + e.getMessage());
+            // Add the row to the table model
+            tableModel.addRow(new Object[]{id, patientName, doctorName, timeSlot});
         }
-    }
 
-    private String getPatientNameById(String patientId) {
-        // Fetch the patient name based on the patient ID
-        String patientName = null;
-        String sql = "SELECT name FROM Patients WHERE id = ?";
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setString(1, patientId);
-            ResultSet resultSet = statement.executeQuery();
-            if (resultSet.next()) {
-                patientName = resultSet.getString("name");
-            }
-        } catch (SQLException e) {
-            System.err.println("Failed to fetch patient name: " + e.getMessage());
-        }
-        return patientName;
+    } catch (SQLException e) {
+        System.err.println("Failed to load appointments: " + e.getMessage());
     }
+}
+
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new AppointmentUI().setVisible(true));

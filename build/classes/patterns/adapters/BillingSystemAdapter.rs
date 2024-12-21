@@ -1,0 +1,2 @@
+patterns.adapters.BillingSystemAdapter
+patterns.adapters.ExternalBillingSystem
